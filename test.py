@@ -1,19 +1,26 @@
 import gdb
 
-def getchar(n):
-	return int(gdb.execute("p (char)p.buf[p.len+"+str(n)+"]", False, True).split()[2])
+currentbufoffset = 0
 
-def getint():
-	a = getchar(0)
+def getchar(p):
+	currentbufoffset += 1
+	return int(gdb.execute("p (char)"+p+".buf["+p+".len+"+str(currentbufoffset-1)+"]", False, True).split()[2])
+
+def getint(p):
+	a = getchar(p)
 	if a == -128:
-		return getchar(1) | (getchar(2)<<8)
+		currentbufoffset += 2
+		return getchar(p) | (getchar(p)<<8)
 	elif a == -127:
-		return getchar(1) | (getchar(2)<<8) | (getchar(3)<<16) | (getchar(4)<<24)
+		currentbufoffset += 4
+		return getchar(p) | (getchar(p)<<8) | (getchar(p)<<16) | (getchar(p)<<24)
 	else:
 		return a
 		
 class TypeChecker(gdb.Breakpoint):
+	
 	def stop (self):
+		currentbufoffset=0
 		if getint() >= 105:
 			gdb.write(gdb.execute("p p.buf"))
 			return True
