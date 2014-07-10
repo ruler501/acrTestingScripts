@@ -2,12 +2,14 @@ import gdb
 
 currentbufoffset = 0
 
-def getchar(p):
+def getchar(p='p'):
+	global currentbufoffset
 	currentbufoffset += 1
 	return int(gdb.execute("p (char)"+p+".buf["+p+".len+"+str(currentbufoffset-1)+"]", False, True).split()[2])
 
 def getint(p):
-	a = getchar(p)
+	global currentbufoffset
+	a = getchar(p='p')
 	if a == -128:
 		currentbufoffset += 2
 		return getchar(p) | (getchar(p)<<8)
@@ -18,10 +20,10 @@ def getint(p):
 		return a
 		
 class TypeChecker(gdb.Breakpoint):
-	
 	def stop (self):
-		currentbufoffset=0
-		if getint() >= 105:
+		global currentbufoffset
+		currentbufoffset = 0
+		if getint('p') >= 105:
 			gdb.write(gdb.execute("p p.buf"))
 			return True
 		return False
