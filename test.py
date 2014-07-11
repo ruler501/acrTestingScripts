@@ -2,10 +2,13 @@ import gdb
 
 currentbufoffset = 0
 
+def retint(var):
+	return gdb.execute("p (int)"+var, False, True).split()[2]
+
 def getchar(p='p'):
 	global currentbufoffset
 	currentbufoffset += 1
-	return int(gdb.execute("p (char)"+p+".buf["+p+".len+"+str(currentbufoffset-1)+"]", False, True).split()[2])
+	return retint(p+".buf["+p+".len+"+str(currentbufoffset-1)+"]")
 
 def getint(p):
 	global currentbufoffset
@@ -28,4 +31,4 @@ class TypeChecker(gdb.Breakpoint):
 			return True
 		return False
 
-TypeChecker("server.cpp:2860")
+TypeChecker("server.cpp:2860", internal=True)

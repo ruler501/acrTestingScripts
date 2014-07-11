@@ -1,6 +1,4 @@
-import Queue
 import sys
-from threading import Thread
 
 if sys.platform.startswith('win32'):
 	from winpexpect import EOF
@@ -30,32 +28,39 @@ def ACRcommand(client=True):
 		raise PlatformError(sys.platform)
 
 
-def main():
-	log = open('debug.log','w')
+def main(argv=None):
+	if argv == None:
+		argv = sys.argv
+	for i in xrange(len(argv)):
+		if argv[i] == "--log":
+			log = open(argv[i+1],'w')
+			break
+	else
+		log = open('debug.log','w')
 	print "Starting child"
-	child = spawn("gdb -quiet -fullname -args "+ACRcommand())
-	child.expect('(gdb)')
-	log.write(child.before + child.after)
+	child = spawn("gdb -quiet -fullname -args "+ACRcommand(), logfile=log)
+	child.expect_exact('(gdb)')
 	print "Loading Scripts"
 	child.sendline('source test.py')
-	child.expect('(gdb)')
-	log.write(child.before + child.after)
+	child.expect_exact('(gdb)')
 	print "Running child"
 	child.sendline('r')
-	try:
-		while child.isalive():
-			i = child.expect(['(gdb)', 'exited with code'], timeout=None)
-			if i == 0:
-				log.write(child.before + "ERROR ABOVE" + child.after)
-				print "continuing"
-				child.sendline('c')
-			elif i == 1:
-				log.write(child.before + child.after + "Exited")
-				log.close()
-				return 0
-	except EOF:
-		pass
-	log.write(child.before)
+	if "--ucontrol" in argv:
+		child.interact()
+	else:
+		try:
+			while child.isalive():
+				i = child.expect_exact(['(gdb)', 'exited with code'], timeout=None)
+				if i == 0:
+					log.write("ERROR ABOVE\n")
+					print "continuing"
+					child.sendline('c')
+				elif i == 1:
+					log.write("Exited\n")
+					log.close()
+					return 0
+		except EOF:
+			pass
 	log.close()
 	return 0
 
