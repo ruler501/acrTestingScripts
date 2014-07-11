@@ -1,10 +1,11 @@
 import sys
+import threading
 
 if sys.platform.startswith('win32'):
-	from winpexpect import EOF
+	from winpexpect import EOF, TIMEOUT
 	from winpexpect import winspawn as spawn
 else:
-	from pexpect import EOF
+	from pexpect import EOF, TIMEOUT
 	from pexpect import spawn
 
 class PlatformError(Exception):
@@ -26,16 +27,21 @@ def ACRcommand(client=True):
 			return "bin_win32/ac_server.exe"
 	else:
 		raise PlatformError(sys.platform)
+		
+def checkRAM():
+	return False
 
-
+shouldExit = False
+	
 def main(argv=None):
+	global shouldExit
 	if argv == None:
 		argv = sys.argv
 	for i in xrange(len(argv)):
 		if argv[i] == "--log":
 			log = open(argv[i+1],'w')
 			break
-	else
+	else:
 		log = open('debug.log','w')
 	print "Starting child"
 	child = spawn("gdb -quiet -fullname -args "+ACRcommand(), logfile=log)
@@ -50,7 +56,7 @@ def main(argv=None):
 	else:
 		try:
 			while child.isalive():
-				i = child.expect_exact(['(gdb)', 'exited with code'], timeout=None)
+				i = child.expect_exact(['(gdb)', 'exited with code', TIMEOUT], timeout=1)
 				if i == 0:
 					log.write("ERROR ABOVE\n")
 					print "continuing"
@@ -59,11 +65,22 @@ def main(argv=None):
 					log.write("Exited\n")
 					log.close()
 					return 0
+				elif i == 2:
+					if checkRAM():
+						log.write("Memory Overflow")
+					if shouldExit:
+						print "Exitting"
+						child.terminate()
 		except EOF:
 			pass
 	log.close()
 	return 0
 
+class debugRun(threading.Thread):
+	def stop(self):
+		global shouldExit
+		shouldExit = True
+	
 if __name__=="__main__":
 	main()
 
