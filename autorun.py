@@ -1,5 +1,6 @@
 import sys
 import threading
+import psutil
 
 if sys.platform.startswith('win32'):
 	from winpexpect import EOF, TIMEOUT
@@ -29,12 +30,16 @@ def ACRcommand(client=True):
 		raise PlatformError(sys.platform)
 		
 def checkRAM():
-	return False
+	if childPID < 1:
+		return False
+	return psutil.Process(childPID).memory_info()[0] > 1073741824
 
 shouldExit = False
-	
+childPID = -1
+
 def main(argv=None):
 	global shouldExit
+	global childPID
 	if argv == None:
 		argv = sys.argv
 	for i in xrange(len(argv)):
@@ -47,10 +52,15 @@ def main(argv=None):
 	child = spawn("gdb -quiet -fullname -args "+ACRcommand(), logfile=log)
 	child.expect_exact('(gdb)')
 	print "Loading Scripts"
-	child.sendline('source test.py')
+	child.sendline('source client.py')
 	child.expect_exact('(gdb)')
 	print "Running child"
 	child.sendline('r')
+	child.expect(r"New Thread \d+\.")
+	try:
+		childPID = int(child.after.split('.')[0].split()[-1])
+	except ValueError:
+		print "Couldn't find the child's PID"
 	if "--ucontrol" in argv:
 		child.interact()
 	else:
@@ -68,6 +78,8 @@ def main(argv=None):
 				elif i == 2:
 					if checkRAM():
 						log.write("Memory Overflow")
+						child.kill(5)
+						#child.terminate()
 					if shouldExit:
 						print "Exitting"
 						child.terminate()

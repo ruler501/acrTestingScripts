@@ -1,4 +1,5 @@
 import gdb
+import psutil
 
 currentbufoffset = 0
 
@@ -31,4 +32,9 @@ class TypeChecker(gdb.Breakpoint):
 			return True
 		return False
 
+class RAMChecker(gdb.Breakpoint):
+	def stop (self):
+		return psutil.Process(gdb.inferiors().pid).memory_info()[0] > 1073741824
+
 TypeChecker("server.cpp:2860", internal=True)
+RAMChecker("main.cpp:1260", internal=True)
