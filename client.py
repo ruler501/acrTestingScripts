@@ -3,17 +3,21 @@ import psutil
 
 currentbufoffset = 0
 
+logfile=open("debug.log",'w')
+
 def retint(var):
-	return gdb.execute("p (int)"+var, False, True).split()[2]
+	return int(gdb.parse_and_eval("(int)"+var))
 
 def getchar(p='p'):
 	global currentbufoffset
+	p = str(p)
 	currentbufoffset += 1
-	return retint(p+".buf["+p+".len+"+str(currentbufoffset-1)+"]")
+	return int(gdb.parse_and_eval("char*)"+p+"["+str(currentbufoffset-1)+"]"))
 
 def getint(p):
 	global currentbufoffset
-	a = getchar(p='p')
+	p = str(p)
+	a = getchar(p)
 	if a == -128:
 		currentbufoffset += 2
 		return getchar(p) | (getchar(p)<<8)
@@ -24,17 +28,48 @@ def getint(p):
 		return a
 		
 class TypeChecker(gdb.Breakpoint):
-	def stop (self):
+	def stop(self):
 		global currentbufoffset
 		currentbufoffset = 0
-		if getint('p') >= 105:
-			gdb.write(gdb.execute("p p.buf"))
+		if retint('type') >= 105:
+			gdb.write(str(gdb.execute("p p.buf")), gdb.STDOUT)
 			return True
 		return False
 
 class RAMChecker(gdb.Breakpoint):
-	def stop (self):
-		return psutil.Process(gdb.inferiors().pid).memory_info()[0] > 1073741824
+	def stop(self):
+		return psutil.Process(gdb.selected_inferior().pid).memory_info()[0] > 1073741824
 
-TypeChecker("server.cpp:2860", internal=True)
+class BotChecker(gdb.Breakpoint):
+	def stop(self):
+		if gdb.parse_and_eval("m_pMyEnt->enemy != NULL"):
+			return True
+		return False
+
+class KDPrinter(gdb.Breakpoint):
+	def stop(self):
+		logfile.write("killer "+str(gdb.parse_and_eval("act->clientnum"))+'\n')
+		for i in xrange(int(gdb.parse_and_eval("NUMGUNS"))):
+			k = int(gdb.parse_and_eval("act->weapstats["+str(i)+"].kills"))
+			d = int(gdb.parse_and_eval("act->weapstats["+str(i)+"].deaths"))
+			if k != 0 or d != 0:
+				logfile.write("Weap "+str(i)+" k:"+str(k)+" d:"+str(d)+"\n")
+		logfile.write("victim "+str(gdb.parse_and_eval("pl->clientnum"))+'\n')
+		for i in xrange(int(gdb.parse_and_eval("NUMGUNS"))):
+			k = int(gdb.parse_and_eval("pl->weapstats["+str(i)+"].kills"))
+			d = int(gdb.parse_and_eval("pl->weapstats["+str(i)+"].deaths"))
+			if k != 0 or d != 0:
+				logfile.write("Weap "+str(i)+" k:"+str(k)+" d:"+str(d)+"\n")
+		return False
+
+class WeaponSelChecker(gdb.Breakpoint):
+	def stop(self):
+		weapon = int(gdb.parse_and_eval("bestWeapon"))
+		logfile.write('client:'+str(gdb.parse_and_eval("m_pMyEnt->clientnum"))+" weap:"+str(weap)+'\n')
+		return !(weapon in [1, 5, 6])
+		
+TypeChecker("server.cpp:2866", internal=True)
 RAMChecker("main.cpp:1260", internal=True)
+#BotChecker("bot_ai.cpp:775") Fixed issue
+KDPrinter("clientgame.cpp:927", internal=True)
+WeaponSelChecker("ac_bot_ai.cpp:113", internal=True)
