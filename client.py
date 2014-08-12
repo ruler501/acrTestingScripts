@@ -64,12 +64,14 @@ class KDPrinter(gdb.Breakpoint):
 
 class WeaponSelChecker(gdb.Breakpoint):
 	def stop(self):
-		weapon = int(gdb.parse_and_eval("bestWeapon"))
+		weap = int(gdb.parse_and_eval("bestWeapon"))
 		logfile.write('client:'+str(gdb.parse_and_eval("m_pMyEnt->clientnum"))+" weap:"+str(weap)+'\n')
-		return !(weapon in [1, 5, 6])
+		if weap not in [0, 1, 5, 6]:
+			gdb.write(str(weap)+',')
+		return False
 		
 TypeChecker("server.cpp:2866", internal=True)
 RAMChecker("main.cpp:1260", internal=True)
-#BotChecker("bot_ai.cpp:775") Fixed issue
-KDPrinter("clientgame.cpp:927", internal=True)
-WeaponSelChecker("ac_bot_ai.cpp:113", internal=True)
+#BotChecker("bot_ai.cpp:775", internal=True) Fixed issue
+#KDPrinter("clientgame.cpp:927", internal=True) Fixed issue
+#WeaponSelChecker("ac_bot_ai.cpp:113", internal=True) Fixed issue
